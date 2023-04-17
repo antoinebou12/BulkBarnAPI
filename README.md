@@ -2,7 +2,17 @@
 BulkBarnAPI https://www.bulkbarn.ca/home-en/index_ON_QC.html
 
 ```
-from bulkbarn import BulkBarn
+pip install poetry
+```
 
-api = BulkBarn()
+```
+poetry install
+```
+
+```
+playwright install
+```
+
+```
+python3 bulkbarn/__init__.py
 ```

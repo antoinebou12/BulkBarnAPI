@@ -1,5 +1,4 @@
 import json
-import re
 from typing import Dict
 from typing import List
 from typing import Union
@@ -7,11 +6,10 @@ from typing import Union
 import httpx
 import pandas as pd
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 from rich.console import Console
 from rich.table import Table
 from utils import *
-from playwright.sync_api import sync_playwright
-import asyncio
 
 
 class BulkBarn:
@@ -51,8 +49,7 @@ class BulkBarn:
                 if cat["name"] == category:
                     response = self.client.get(cat["url"])
                     soup = BeautifulSoup(response.text, "html.parser")
-                    product_elements = soup.find_all(
-                        "li", class_="prod-thumbnail")
+                    product_elements = soup.find_all("li", class_="prod-thumbnail")
 
                     for element in product_elements:
                         if product := self.parse_product_element(element):
@@ -72,8 +69,7 @@ class BulkBarn:
     @staticmethod
     def parse_product_element(element) -> Union[Dict[str, Union[str, int]], None]:
         link = element.find("a", class_="product_thumbnail_item")
-        product_thumbnail_copy = element.find(
-            "div", class_="product_thumbnail_copy")
+        product_thumbnail_copy = element.find("div", class_="product_thumbnail_copy")
 
         if link is not None and product_thumbnail_copy is not None:
             product_name = product_thumbnail_copy.find(
@@ -117,24 +113,19 @@ class BulkBarn:
         soup = BeautifulSoup(response.text, "html.parser")
 
         # get all the images urls
-        image = soup.find("section", {
-            "id": "products-content"
-        }).find(
+        image = soup.find("section", {"id": "products-content"}).find(
             "li", class_="normalscale centered blowup currentDisplayItem"
         )
 
         image_url = "image['data-blowup-content']"
 
-        product_redbox = soup.find("section", {
-            "id": "products-content"
-        }).find_all("div", class_="greystripe product-detail-card [nutrition-status]")[1]
+        product_redbox = soup.find("section", {"id": "products-content"}).find_all(
+            "div", class_="greystripe product-detail-card [nutrition-status]"
+        )[1]
 
-        product_name = product_redbox.find(
-            "p", class_="prod-name").text.strip()
-        product_bbplu = product_redbox.find(
-            "p", class_="prod-desc").text.strip()
-        product_price = product_redbox.find(
-            "p", class_="prod-price").text.strip()
+        product_name = product_redbox.find("p", class_="prod-name").text.strip()
+        product_bbplu = product_redbox.find("p", class_="prod-desc").text.strip()
+        product_price = product_redbox.find("p", class_="prod-price").text.strip()
         # get product details
 
         def extract_text(element):
@@ -142,19 +133,35 @@ class BulkBarn:
 
         details = {
             "Dietary Information": {
-                "Organic": extract_text(product_redbox.find("li", class_="list-ind-organic")),
-                "Peanut Free": extract_text(product_redbox.find("li", class_="list-ind-peanutfree")),
-                "Vegan": extract_text(product_redbox.find("li", class_="list-ind-vegan")),
-                "Gluten-Free": extract_text(product_redbox.find("li", class_="list-ind-glutenfree")),
-                "Dairy Free": extract_text(product_redbox.find("li", class_="list-ind-dairyfree")),
-                "Non GMO": extract_text(product_redbox.find("li", class_="list-ind-nongmo")),
+                "Organic": extract_text(
+                    product_redbox.find("li", class_="list-ind-organic")
+                ),
+                "Peanut Free": extract_text(
+                    product_redbox.find("li", class_="list-ind-peanutfree")
+                ),
+                "Vegan": extract_text(
+                    product_redbox.find("li", class_="list-ind-vegan")
+                ),
+                "Gluten-Free": extract_text(
+                    product_redbox.find("li", class_="list-ind-glutenfree")
+                ),
+                "Dairy Free": extract_text(
+                    product_redbox.find("li", class_="list-ind-dairyfree")
+                ),
+                "Non GMO": extract_text(
+                    product_redbox.find("li", class_="list-ind-nongmo")
+                ),
             },
             "Ingredients": extract_text(product_redbox.find("p", class_="prod-ing")),
             "Allergens": extract_text(product_redbox.find("p", class_="prod-algn")),
-            "Directions for Use": extract_text(product_redbox.find("p", class_="prod-dir")),
+            "Directions for Use": extract_text(
+                product_redbox.find("p", class_="prod-dir")
+            ),
             "Usage Tips": extract_text(product_redbox.find("p", class_="prod-use")),
             "Storage Tips": extract_text(product_redbox.find("p", class_="prod-store")),
-            "Points of Interest": extract_text(product_redbox.find("p", class_="prod-poi")),
+            "Points of Interest": extract_text(
+                product_redbox.find("p", class_="prod-poi")
+            ),
             "Other": extract_text(product_redbox.find("p", class_="prod-other")),
         }
 
@@ -176,27 +183,31 @@ class BulkBarn:
             "Protein": "",
             "Vitamin A": {"Value": "", "Percentage": ""},
             "Vitamin C": {"Value": "", "Percentage": ""},
-            "Cholesterol":"",
+            "Cholesterol": "",
             "Sodium": {"Value": "", "Percentage": ""},
             "Potassium": {"Value": "", "Percentage": ""},
             "Calcium": {"Value": "", "Percentage": ""},
             "Iron": {"Value": "", "Percentage": ""},
         }
 
-        nutrition_facts_div = soup.find("section", class_="product_detail_copy product-description-template-target")
+        nutrition_facts_div = soup.find(
+            "section", class_="product_detail_copy product-description-template-target"
+        )
         if not nutrition_facts_div:
             return nutrition_facts
 
         serving_size = nutrition_facts_div.find(
-            lambda tag: tag.name == "p" and "Serving Size" in tag.text)
+            lambda tag: tag.name == "p" and "Serving Size" in tag.text
+        )
         if serving_size:
-            nutrition_facts["Serving Size"] = serving_size.text.splitlines()[
-                0].replace("Serving Size", "").strip()
-            nutrition_facts["Portion"] = serving_size.text.splitlines()[
-                1].replace("Portion", "").strip()
+            nutrition_facts["Serving Size"] = (
+                serving_size.text.splitlines()[0].replace("Serving Size", "").strip()
+            )
+            nutrition_facts["Portion"] = (
+                serving_size.text.splitlines()[1].replace("Portion", "").strip()
+            )
 
-        rows = nutrition_facts_div.find_all(
-            "div", class_="newrow border-bottom")
+        rows = nutrition_facts_div.find_all("div", class_="newrow border-bottom")
 
         print(nutrition_facts_div)
 
@@ -209,14 +220,26 @@ class BulkBarn:
             if "Calories" in key:
                 nutrition_facts["Calories"] = value
             elif "Fat" in key and "Saturated" not in key:
-                nutrition_facts["Fat"]["Total"]["Value"] = key.split(
-                )[-2] + " " + key.split()[-1]
-                nutrition_facts["Fat"]["Total"]["Percentage"] = value.split()[
-                    0]
+                nutrition_facts["Fat"]["Total"]["Value"] = (
+                    key.split()[-2] + " " + key.split()[-1]
+                )
+                nutrition_facts["Fat"]["Total"]["Percentage"] = value.split()[0]
             elif "Saturated" in key:
-                nutrition_facts["Fat"]["Saturated"]["Value"] = key.split()[-5] + " " + key.split()[-4] + " " + key.split()[-3] + " " + key.split()[-2] + " " + key.split()[-1]  
+                nutrition_facts["Fat"]["Saturated"]["Value"] = (
+                    key.split()[-5]
+                    + " "
+                    + key.split()[-4]
+                    + " "
+                    + key.split()[-3]
+                    + " "
+                    + key.split()[-2]
+                    + " "
+                    + key.split()[-1]
+                )
                 nutrition_facts["Fat"]["Saturated"]["Percentage"] = value.split()[0]
-                nutrition_facts["Fat"]["Trans"]["Value"] = key.split()[-3] + " " + key.split()[-2] + " " + key.split()[-1]
+                nutrition_facts["Fat"]["Trans"]["Value"] = (
+                    key.split()[-3] + " " + key.split()[-2] + " " + key.split()[-1]
+                )
                 nutrition_facts["Fat"]["Trans"]["Percentage"] = value.split()[0]
             elif "Cholesterol" in key:
                 nutrition_facts["Cholesterol"] = value
@@ -224,23 +247,37 @@ class BulkBarn:
                 nutrition_facts["Sodium"]["Value"] = value
                 nutrition_facts["Sodium"]["Percentage"] = value.split()[0]
             elif "Carbohydrate" in key:
-                nutrition_facts["Carbohydrate"]["Total"]["Value"] = key.split(
-                )[-2] + " " + key.split()[-1]
-                nutrition_facts["Carbohydrate"]["Total"]["Percentage"] = value.split()[0]
+                nutrition_facts["Carbohydrate"]["Total"]["Value"] = (
+                    key.split()[-2] + " " + key.split()[-1]
+                )
+                nutrition_facts["Carbohydrate"]["Total"]["Percentage"] = value.split()[
+                    0
+                ]
             elif "Fibre" in key:
-                nutrition_facts["Carbohydrate"]["Fibre"]["Value"] = key.split(
-                )[-2] + " " + key.split()[-1]
-                nutrition_facts["Carbohydrate"]["Fibre"]["Percentage"] = value.split()[0]
+                nutrition_facts["Carbohydrate"]["Fibre"]["Value"] = (
+                    key.split()[-2] + " " + key.split()[-1]
+                )
+                nutrition_facts["Carbohydrate"]["Fibre"]["Percentage"] = value.split()[
+                    0
+                ]
             elif "Sugars" in key:
-                nutrition_facts["Carbohydrate"]["Sugars"]["Value"] = key.split()[-2] + " " + key.split()[-1]
-                nutrition_facts["Carbohydrate"]["Sugars"]["Percentage"] = key.split()[-2]
+                nutrition_facts["Carbohydrate"]["Sugars"]["Value"] = (
+                    key.split()[-2] + " " + key.split()[-1]
+                )
+                nutrition_facts["Carbohydrate"]["Sugars"]["Percentage"] = key.split()[
+                    -2
+                ]
             elif "Protein" in key:
                 nutrition_facts["Protein"] = key.split()[-2] + " " + key.split()[-1]
             elif "Vitamin A" in key:
-                nutrition_facts["Vitamin A"]["Value"] = key.split()[-2] + " " + key.split()[-1]
+                nutrition_facts["Vitamin A"]["Value"] = (
+                    key.split()[-2] + " " + key.split()[-1]
+                )
                 nutrition_facts["Vitamin A"]["Percentage"] = value.split()[0]
             elif "Vitamin C" in key:
-                nutrition_facts["Vitamin C"]["Value"] = key.split()[-2] + " " + key.split()[-1]
+                nutrition_facts["Vitamin C"]["Value"] = (
+                    key.split()[-2] + " " + key.split()[-1]
+                )
                 nutrition_facts["Vitamin C"]["Percentage"] = value.split()[0]
             elif "Cholesterol" in key:
                 nutrition_facts["Cholesterol"] = key
@@ -258,7 +295,6 @@ class BulkBarn:
             elif "Iron" in key:
                 nutrition_facts["Iron"]["Value"] = key
                 nutrition_facts["Iron"]["Percentage"] = value.split()[0]
-
 
         console = Console()
         console.print(nutrition_facts)
@@ -313,16 +349,16 @@ class BulkBarn:
 
         self.categories = categories
         return categories
-    
+
     def get_recipes(self) -> List[Dict[str, Union[str, int]]]:
         """Get recipes from Bulk Barn website."""
-
-
 
     def get_deals(self) -> List[Dict[str, Union[str, int]]]:
         pass
 
-    def get_products_by_category(self, category: str) -> List[Dict[str, Union[str, int]]]:
+    def get_products_by_category(
+        self, category: str
+    ) -> List[Dict[str, Union[str, int]]]:
         """Get products by category from Bulk Barn website."""
         if self.products is None:
             self.get_products()
@@ -338,11 +374,7 @@ class BulkBarn:
         """Get products by id from Bulk Barn website."""
         if self.products is None:
             self.get_products()
-        return [
-            product
-            for product in self.products
-            if product["bbPLU"] == id
-        ]
+        return [product for product in self.products if product["bbPLU"] == id]
 
     def get_products_by_keyword(self, keyword: str) -> List[Dict[str, Union[str, int]]]:
         """Get products by keyword from Bulk Barn website."""
@@ -386,7 +418,6 @@ class BulkBarn:
                 phone = phone.strip()
                 map_url = element.find("a", {"target": "_blank"})["href"]
 
-
                 self.store_locations.append(
                     {
                         "store_id": store_id,
@@ -406,8 +437,10 @@ class BulkBarn:
         :param data: Dictionary containing key-value pairs to set in local storage
         """
         for key, value in data.items():
-            function = '(key, value) => { window.localStorage.setItem($key, $value); }'
-            function = function.replace("$key", f"'{key}'").replace("$value", f"'{value}'")
+            function = "(key, value) => { window.localStorage.setItem($key, $value); }"
+            function = function.replace("$key", f"'{key}'").replace(
+                "$value", f"'{value}'"
+            )
             page.evaluate(function)
 
     def get_local_storage(self, page, key: str) -> str:
@@ -418,51 +451,156 @@ class BulkBarn:
         :param key: Key to get from local storage
         :return: Value of key
         """
-        function = '(key) => { return window.localStorage.getItem($key); }'
+        function = "(key) => { return window.localStorage.getItem($key); }"
         function = function.replace("$key", f"'{key}'")
         return page.evaluate(function)
 
-    def setup_cart(self, store_id: int) -> None:
+    def generate_cart_array(self, items: List[Dict[str, Union[str, int]]]) -> str:
+        cart_array = [
+            {
+                "itemNo": str(item["bbPLU"]),
+                "QTY": str(item["quantity"]),
+                "userQTY": "",
+                "userUOM": "",
+                "niceUserQTY": " x ",
+            }
+            for item in items
+        ]
+        return json.dumps(cart_array)
+
+    def add_item(self, item_no: str, quantity: int) -> None:
+        self.items.append({"item_no": item_no, "quantity": quantity})
+
+    def generate_item(self, item: Dict[str, Union[str, int]]) -> str:
+        # {"boxID":"29","Product_name_EN":"Mixed Nuts With Peanuts, Roasted &amp; Salted","Product_name_FR":"Noix m&eacute;lang&eacute;es avec arachides, r&ocirc;ties et sal&eacute;es","keywords_EN":"nuts, roasted, salted, DELTAUPDATE","keywords_FR":"noix, roties, salees, DELTAUPDATE","photo":"129_000129.png","upccode":"129","not_in_quebec":"0","BBPLU":"129","Item_No":"129","Posting_Group":"BULK","Organic":"No","Mono_Cup_Item":"No","Sml_Scoop_Item":"No","Cup_Weight":"0.100","Sml_Scoop_Wgt":"","Lrg_Scoop_Wgt":"0.300","Mono_8oz_Wgt":"","Mono_16oz_Wgt":"","Mono_32oz_Wgt":"","Retail_Price":"1.81","Retail_Price_UOM":"PER KG","Retail_Price_100g":"1.818","Sale_Price":"1.18","Sale_Start_Date":"2020-08-06 00:01","Sale_End_Date":"3020-12-31 23:59","GST_HST_Applicable":"Yes","AB_PST":"No","BC_PST":"No","MB_PST":"Yes","NB_PST":"No","NL_PST":"No","NS_PST":"No","NT_PST":"No","ON_PST":"No","PE_PST":"No","QC_PST":"Yes","SK_PST":"Yes"}
+        return {
+            "boxID": item["boxID"],
+            "Product_name_EN": item["Product_name_EN"],
+            "Product_name_FR": item["Product_name_FR"],
+            "keywords_EN": item["keywords_EN"],
+            "keywords_FR": item["keywords_FR"],
+            "photo": item["photo"],
+            "upccode": item["upccode"],
+            "not_in_quebec": item["not_in_quebec"],
+            "BBPLU": item["BBPLU"],
+            "Item_No": item["Item_No"],
+            "Posting_Group": item["Posting_Group"],
+            "Organic": item["Organic"],
+            "Mono_Cup_Item": item["Mono_Cup_Item"],
+            "Sml_Scoop_Item": item["Sml_Scoop_Item"],
+            "Cup_Weight": item["Cup_Weight"],
+            "Sml_Scoop_Wgt": item["Sml_Scoop_Wgt"],
+            "Lrg_Scoop_Wgt": item["Lrg_Scoop_Wgt"],
+            "Mono_8oz_Wgt": item["Mono_8oz_Wgt"],
+            "Mono_16oz_Wgt": item["Mono_16oz_Wgt"],
+            "Mono_32oz_Wgt": item["Mono_32oz_Wgt"],
+            "Retail_Price": item["Retail_Price"],
+            "Retail_Price_UOM": item["Retail_Price_UOM"],
+            "Retail_Price_100g": item["Retail_Price_100g"],
+            "Sale_Price": item["Sale_Price"],
+            "Sale_Start_Date": item["Sale_Start_Date"],
+            "Sale_End_Date": item["Sale_End_Date"],
+            "GST_HST_Applicable": item["GST_HST_Applicable"],
+            "AB_PST": item["AB_PST"],
+            "BC_PST": item["BC_PST"],
+            "MB_PST": item["MB_PST"],
+            "NB_PST": item["NB_PST"],
+            "NL_PST": item["NL_PST"],
+            "NS_PST": item["NS_PST"],
+            "NT_PST": item["NT_PST"],
+            "ON_PST": item["ON_PST"],
+            "PE_PST": item["PE_PST"],
+            "QC_PST": item["QC_PST"],
+            "SK_PST": item["SK_PST"],
+        }
+
+    def change_price(
+        self,
+        page,
+        item: Dict,
+        retail_price: str,
+        retail_price_100g: str,
+        sale_price: str,
+    ) -> None:
+        # sourcery skip: avoid-builtin-shadow
+        """Change price of item in cart."""
+        item = json.loads(item)
+
+        item["Retail_Price"] = retail_price
+        item["Retail_Price_100g"] = retail_price_100g
+        item["Sale_Price"] = sale_price
+        id = item["BBPLU"]
+        item = json.dumps(self.generate_item(item))
+        self.set_local_storage(page, {"item" + id: item})
+        return item
+
+    def create_store(self, store_id: int, province: str) -> None:
+        # {"storeCode":"527","Address":"741 ALGONQUIN BOULEVARD EAST","City":"TIMMINS","Province":"ON","Phone":"(705) 268-2355","Mon":"09:30 am - 08:00 pm","Tue":"09:30 am - 08:00 pm","Wed":"09:30 am - 08:00 pm","Thur":"09:30 am - 08:00 pm","Fri":"09:30 am - 08:00 pm","Sat":"09:30 am - 06:00 pm","Sun":"10:00 am - 05:00 pm","Curbside":"x","PickupWindow":"2"}
+        """Create store."""
+        return {
+            "storeCode": store_id,
+            "Address": "",
+            "City": "",
+            "Province": province,
+            "Phone": "",
+            "Mon": "",
+            "Tue": "",
+            "Wed": "",
+            "Thur": "",
+            "Fri": "",
+            "Sat": "",
+            "Sun": "",
+            "Curbside": "",
+            "PickupWindow": "",
+        }
+
+    def set_store(self, page, store_id: int, province: str) -> None:
+        """Set store."""
+        self.set_local_storage(page, {"storeCode": store_id})
+        self.set_local_storage(page, {"userProvince": province})
+
+    def setup_cart(
+        self,
+        store_id: int = "741",
+        province: str = "QC",
+        items: List[Dict[str, Union[str, int]]] = None,
+        headless: bool = True,
+    ):
         """Setup cart for store."""
-        self.cart = {"store_id": store_id, "province": "QC", "items": []}
+        if items is None:
+            items = []
+        self.cart = {"store_id": store_id, "province": province, "items": list(items)}
 
         with sync_playwright() as p:
-                for browser_type in [p.chromium]:
-                    browser = browser_type.launch(headless=True)
-                    page = browser.new_page()
-                    # Set local storage
-                    page.goto(BULKBARN_ECOMM_URL)
-                    self.set_local_storage(page, {"userProvince": str(self.cart["province"])})
-                    self.set_local_storage(page, {"storeCode": str(self.cart["store_id"])})
-                    self.set_local_storage(page, {'cartArray': '[{"itemNo":"129","QTY":"1","userQTY":"","userUOM":"","niceUserQTY":" x "}]'})
-                    page.goto("https://www.bulkbarn.ca/ecomm/cart.html")
+            for browser_type in [p.chromium]:
+                browser = browser_type.launch(headless=headless)
+                page = browser.new_page()
 
-    def get_ecomm_products(self) -> List[Dict[str, Union[str, int]]]:
-            """Get ecomm products from Bulk Barn website."""
-            # [{"itemNo":"129","QTY":"1","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"3200","QTY":"1","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"53","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"11","QTY":"1","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"23","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"74","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"267","QTY":"1","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"373","QTY":"0.1","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"524","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"669","QTY":"0.2","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1536","QTY":"0.3","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1611","QTY":"0.3","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1608","QTY":"0.3","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1724","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1770","QTY":"0.3","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"20","QTY":"0.3","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"214","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"217","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"219","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"358","QTY":"0.3","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"426","QTY":"0.2","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"431","QTY":"0.2","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"800","QTY":"0.1","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1216","QTY":"0.2","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1251","QTY":"0.4","userQTY":"","userUOM":"","niceUserQTY":" x "},{"itemNo":"1518","QTY":"0.5","userQTY":"","userUOM":"","niceUserQTY":" x "}]
-            with sync_playwright() as p:
-                for browser_type in [p.chromium]:
-                    browser = browser_type.launch()
-                    page = browser.new_page(ignore_https_errors=True)
-                    page.goto(BULKBARN_ECOMM_URL)
-                    page.goto("https://www.bulkbarn.ca/ecomm/cart.html")
-                    # Set local storage
-                    # self.set_local_storage(page, {'item129', '{"boxID":"29","Product_name_EN":"Mixed Nuts With Peanuts, Roasted &amp; Salted","Product_name_FR":"Noix m&eacute;lang&eacute;es avec arachides, r&ocirc;ties et sal&eacute;es","keywords_EN":"nuts, roasted, salted, DELTAUPDATE","keywords_FR":"noix, roties, salees, DELTAUPDATE","photo":"129_000129.png","upccode":"129","not_in_quebec":"0","BBPLU":"129","Item_No":"129","Posting_Group":"BULK","Organic":"No","Mono_Cup_Item":"No","Sml_Scoop_Item":"No","Cup_Weight":"0.156","Sml_Scoop_Wgt":"","Lrg_Scoop_Wgt":"0.312","Mono_8oz_Wgt":"","Mono_16oz_Wgt":"","Mono_32oz_Wgt":"","Retail_Price":"18.18","Retail_Price_UOM":"PER KG","Retail_Price_100g":"1.818","Sale_Price":"18.18","Sale_Start_Date":"2020-08-06 00:01","Sale_End_Date":"3020-12-31 23:59","GST_HST_Applicable":"Yes","AB_PST":"No","BC_PST":"No","MB_PST":"Yes","NB_PST":"No","NL_PST":"No","NS_PST":"No","NT_PST":"No","ON_PST":"No","PE_PST":"No","QC_PST":"Yes","SK_PST":"Yes"}'})
-                    self.set_local_storage(page, {"userProvince": "QC"})
-                    self.set_local_storage(page, {"store741": '{"storeCode":"741","Address":"1616 RUE SAINTE-CATHERINE OUEST","City":"MONTR&Eacute;AL (MONTREAL)","Province":"QC","Phone":"(514) 932-9748","Mon":"09:30 am - 08:30 pm","Tue":"09:30 am - 08:30 pm","Wed":"09:30 am - 08:30 pm","Thur":"09:30 am - 08:30 pm","Fri":"09:30 am - 08:30 pm","Sat":"09:30 am - 08:00 pm","Sun":"10:00 am - 05:00 pm","Curbside":"x","PickupWindow":"2"}'})
-                    self.set_local_storage(page, {"storeCode": "741"})
-                    self.set_local_storage(page, {'cartArray': '[{"itemNo":"129","QTY":"1","userQTY":"","userUOM":"","niceUserQTY":" x "}]'})
-                    page.goto("https://www.bulkbarn.ca/ecomm/cart.html")
-                    page.screenshot(path=f'example-{browser_type.name}.png')
-                    # Get local storage
-                    local_storage = page.evaluate("() => JSON.parse(window.localStorage.getItem('cartArray'))")
-                    print(local_storage)
-                    local_storage = page.evaluate("() => JSON.parse(window.localStorage.getItem('storeCode'))")
-                    print(local_storage)
-                    self.ecomm_products = local_storage
-                    browser.close()
+                page.goto(BULKBARN_STORES_URL)
+                self.set_store(page, store_id, province)
+                page.goto(BULKBARN_ECOMM_URL)
+                page.goto("https://www.bulkbarn.ca/ecomm/cart.html")
+                self.set_store(page, store_id, province)
 
-            return self.ecomm_products
+                self.change_price(
+                    page,
+                    self.get_local_storage(page, "item129"),
+                    "1.99",
+                    "1.99",
+                    "1.99",
+                )
+
+                self.set_store(page, store_id, province)
+                self.set_local_storage(
+                    page, {"cartArray": self.generate_cart_array(self.cart["items"])}
+                )
+
+                page.goto("https://www.bulkbarn.ca/ecomm/cart.html")
+                page.screenshot(path="cart.png")
+                # stay open browser after script is done
+                if not headless:
+                    input("Press Enter to continue...")
+                browser.close()
 
 
 if __name__ == "__main__":
@@ -471,4 +609,9 @@ if __name__ == "__main__":
     #     "https://www.bulkbarn.ca/en/Products/All/Merckens-Light-Chocolate-Flavoured-Molding-Wafers"
     # )
     # print(bulkbarn.get_store_locations())
-    bulkbarn.get_ecomm_products()
+    bulkbarn.setup_cart(
+        store_id=741,
+        province="QC",
+        items=[{"bbPLU": "129", "quantity": 1}],
+        headless=False,
+    )
